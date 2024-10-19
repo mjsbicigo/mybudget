@@ -1,0 +1,130 @@
+name: CI Workflow
+
+on: # Ao realizar um push ou pull request na branch main
+  push:
+    branches:
+      - main  # Ou a branch desejada
+  pull_request:
+    branches:
+      - main  # Ou a branch desejada
+
+# Executa os seguintes jobs
+
+jobs:
+  test-backend-api:
+    runs-on: ubuntu-latest
+
+    services:
+      # Serviço do MongoDB
+      mongodb:
+        image: mongo:4.4
+        ports:
+          - 27017:27017
+        options: --health-cmd "mongo --eval 'db.runCommand(\"ping\").ok'" --health-interval 10s --health-timeout 5s --health-retries 5
+      
+      # Serviço do Redis
+      redis:
+        image: redis:latest
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    
+    env:
+      # Variáveis de ambiente necessárias para os testes
+      MONGO_URI: mongodb://localhost:27017
+      REDIS_URI: redis://localhost:6379
+      SECRET_KEY: secretkey
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.12'
+
+      - name: Install backend-api dependencies
+        working-directory: ./backend-api
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run backend tests
+        run: |
+          cd backend-api/app/
+          pytest
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    needs: test-backend-api  # Este job depende do anterior
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          pip install -r requirements.txt
+
+      - name: Start Flask app
+        run: |
+          cd frontend  # Mude para o diretório da aplicação Flask
+          nohup python main.py &
+          sleep 5
+
+      - name: Run frontend tests
+        run: |
+          cd frontend/app/
+          pytest
+
+  build-push-docker-image:
+    runs-on: ubuntu-latest
+    needs: test-frontend  # Este job depende do anterior
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub      # Autenticação utilizando variáveis de ambiente pré-configuradas.
+        uses: docker/login-action@v3
+        with:
+          username: marciosbicigo
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Get short commit SHA    # Variável de tageamento automático baseado no SHA do commit.
+        id: vars
+        run: echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Build and push frontend image   # Build frontend
+        run: |
+          docker build -t marciosbicigo/mybudget-frontend:${{ env.COMMIT_SHA }} -f ./frontend/Dockerfile ./frontend
+          docker push marciosbicigo/mybudget-frontend:${{ env.COMMIT_SHA }}
+          docker tag marciosbicigo/mybudget-frontend:${{ env.COMMIT_SHA }} marciosbicigo/mybudget-frontend:latest
+          docker push marciosbicigo/mybudget-frontend:latest
+
+      - name: Build and push backend-api image   # Build backend
+        run: |
+          docker build -t marciosbicigo/mybudget-backend-api:${{ env.COMMIT_SHA }} -f ./backend-api/Dockerfile ./backend-api
+          docker push marciosbicigo/mybudget-backend-api:${{ env.COMMIT_SHA }}
+          docker tag marciosbicigo/mybudget-backend-api:${{ env.COMMIT_SHA }} marciosbicigo/mybudget-backend-api:latest
+          docker push marciosbicigo/mybudget-backend-api:latest
