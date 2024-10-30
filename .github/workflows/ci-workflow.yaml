@@ -4,9 +4,14 @@ on: # Ao realizar um push ou pull request na branch main
   push:
     branches:
       - main  # Ou a branch desejada
+    paths-ignore:
+      - README.md  # Ignora alterações no README.md
+      
   pull_request:
     branches:
       - main  # Ou a branch desejada
+    paths-ignore:
+      - README.md
 
 # Executa os seguintes jobs
 
