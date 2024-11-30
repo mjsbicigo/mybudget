@@ -48,9 +48,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      - name: Checkout code
-        uses: actions/checkout@v2
-
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
@@ -87,8 +84,8 @@ jobs:
 
       - name: Start Flask app
         run: |
-          cd frontend  # Mude para o diretório da aplicação Flask
-          nohup python main.py &
+          cd frontend
+          nohup python main.py & 
           sleep 5
 
       - name: Run frontend tests
@@ -110,26 +107,31 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to DockerHub      # Autenticação utilizando variáveis de ambiente pré-configuradas.
+      - name: Login to DockerHub  # Autenticação no DockerHub.
         uses: docker/login-action@v3
         with:
           username: marciosbicigo
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Get short commit SHA    # Variável de tageamento automático baseado no SHA do commit.
+      - name: Get short commit SHA  # Variável de tageamento automático baseado no SHA do commit.
         id: vars
         run: echo "COMMIT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
-      - name: Build and push frontend image   # Build frontend
+      - name: Build and push frontend image # Build frontend image
         run: |
           docker build -t marciosbicigo/mybudget-frontend:${{ env.COMMIT_SHA }} -f ./frontend/Dockerfile ./frontend
           docker push marciosbicigo/mybudget-frontend:${{ env.COMMIT_SHA }}
           docker tag marciosbicigo/mybudget-frontend:${{ env.COMMIT_SHA }} marciosbicigo/mybudget-frontend:latest
           docker push marciosbicigo/mybudget-frontend:latest
 
-      - name: Build and push backend-api image   # Build backend
+      - name: Build and push backend-api image  # Build backend image
         run: |
           docker build -t marciosbicigo/mybudget-backend-api:${{ env.COMMIT_SHA }} -f ./backend-api/Dockerfile ./backend-api
           docker push marciosbicigo/mybudget-backend-api:${{ env.COMMIT_SHA }}
           docker tag marciosbicigo/mybudget-backend-api:${{ env.COMMIT_SHA }} marciosbicigo/mybudget-backend-api:latest
           docker push marciosbicigo/mybudget-backend-api:latest
+
+      - name: Output last Docker image tags
+        run: |
+          echo "Frontend image tag: marciosbicigo/mybudget-frontend:${{ env.COMMIT_SHA }}"
+          echo "Backend image tag: marciosbicigo/mybudget-backend-api:${{ env.COMMIT_SHA }}"
