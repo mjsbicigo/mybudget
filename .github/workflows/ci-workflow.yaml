@@ -131,7 +131,7 @@ jobs:
           docker tag marciosbicigo/mybudget-backend-api:${{ env.COMMIT_SHA }} marciosbicigo/mybudget-backend-api:latest
           docker push marciosbicigo/mybudget-backend-api:latest
 
-      - name: Output last Docker image tags
+      - name: Output last Docker image tags # Retorna como output as tags que foram criadas 
         run: |
           echo "Frontend image tag: marciosbicigo/mybudget-frontend:${{ env.COMMIT_SHA }}"
           echo "Backend image tag: marciosbicigo/mybudget-backend-api:${{ env.COMMIT_SHA }}"
